@@ -156,3 +156,16 @@ uploads/（文件存储）
 安装rust
 venv310\Scripts\activate 
 使用这个环境
+Swagger UI: http://127.0.0.1:8000/docs
+ReDoc: http://127.0.0.1:8000/redoc
+
+
+uvicorn app.main:app --reload
+执行流程
+命令执行后，uvicorn首先定位到app/main.py文件
+然后它导入这个文件中名为app的FastAPI实例
+uvicorn启动HTTP服务器(默认在127.0.0.1:8000)
+当有请求到达时，uvicorn将它们转发给FastAPI实例处理
+FastAPI根据请求路径找到对应的路由函数并执行
+函数返回的结果被转换为HTTP响应并发送回客户端
+
