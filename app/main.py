@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import auth, users
-from app.api import positions
+from app.api import positions,interviews
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -35,8 +35,14 @@ app.include_router(
 app.include_router(
     positions.router,
     prefix="/api/v1",
-    tags=["Positions"]
     )
+
+app.include_router(
+    interviews.router,
+    prefix="/api/v1",
+    )
+
+
 
 # 首页路由
 @app.get("/")
