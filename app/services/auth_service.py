@@ -5,13 +5,27 @@ from app.core.security import verify_password, create_access_token
 from app.core.config import settings
 from app.schemas.user import UserCreate
 
-def authenticate_user(db: Session, email: str, password: str):
-    """验证用户并返回用户对象"""
-    # 获取用户
-    user = user_repo.get_user_by_email(db, email)
+def authenticate_user(db: Session, username_or_email: str, password: str):
+    """
+    验证用户并返回用户对象
+    支持用户名或邮箱登录 - 匹配前端发送的username字段
+    """
+    user = None
+    
+    # 首先尝试作为邮箱查找
+    if "@" in username_or_email:
+        user = user_repo.get_user_by_email(db, username_or_email)
+    
+    # 如果邮箱查找失败，或者输入不包含@，尝试作为用户名查找
+    if not user:
+        user = user_repo.get_user_by_username(db, username_or_email)
     
     # 验证密码
     if not user or not verify_password(password, user.hashed_password):
+        return None
+        
+    # 检查用户是否激活
+    if not user.is_active:
         return None
         
     return user
@@ -31,6 +45,55 @@ def get_user_by_email(db: Session, email: str):
     """通过邮箱获取用户"""
     return user_repo.get_user_by_email(db, email)
 
+def get_user_by_username(db: Session, username: str):
+    """通过用户名获取用户"""
+    return user_repo.get_user_by_username(db, username)
+
 def create_user(db: Session, user_data: UserCreate):
     """创建新用户"""
     return user_repo.create_user(db, user_data)
+
+def check_user_exists(db: Session, username: str = None, email: str = None):
+    """
+    检查用户是否已存在
+    返回 (username_exists, email_exists)
+    """
+    username_exists = False
+    email_exists = False
+    
+    if username:
+        existing_user = user_repo.get_user_by_username(db, username)
+        username_exists = existing_user is not None
+    
+    if email:
+        existing_user = user_repo.get_user_by_email(db, email)
+        email_exists = existing_user is not None
+    
+    return username_exists, email_exists
+
+def validate_user_data(db: Session, user_data: UserCreate):
+    """
+    验证用户注册数据
+    返回 (is_valid, error_message)
+    """
+    # 检查用户名和邮箱是否已存在
+    username_exists, email_exists = check_user_exists(
+        db, 
+        username=user_data.username, 
+        email=user_data.email
+    )
+    
+    if username_exists:
+        return False, "用户名已存在"
+    
+    if email_exists:
+        return False, "邮箱已被注册"
+    
+    # 其他验证逻辑可以在这里添加
+    if len(user_data.password) < 6:
+        return False, "密码长度至少6位"
+    
+    if len(user_data.username) < 3:
+        return False, "用户名长度至少3位"
+    
+    return True, "验证通过"
