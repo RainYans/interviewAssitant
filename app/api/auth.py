@@ -68,6 +68,7 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         )
 
 @router.post("/register")
+@router.post("/register")
 def register(register_data: RegisterRequest, db: Session = Depends(get_db)):
     """
     用户注册API - 修改为支持前端格式
@@ -76,11 +77,19 @@ def register(register_data: RegisterRequest, db: Session = Depends(get_db)):
     返回格式: {code, data, message}
     """
     try:
-        # 检查邮箱是否已存在
-        db_user = auth_service.get_user_by_email(db, register_data.email)
-        if db_user:
+        # 检查用户名是否已存在
+        existing_user_by_username = auth_service.get_user_by_username(db, register_data.username)
+        if existing_user_by_username:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=status.HTTP_409_CONFLICT,
+                detail="用户名已被注册"
+            )
+        
+        # 检查邮箱是否已存在
+        existing_user_by_email = auth_service.get_user_by_email(db, register_data.email)
+        if existing_user_by_email:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
                 detail="邮箱已被注册"
             )
         
