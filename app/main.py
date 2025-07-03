@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.openapi.utils import get_openapi  # 新增导入
 import time
 
 from app.core.config import settings
@@ -17,6 +18,35 @@ app = FastAPI(
     redoc_url=f"{settings.API_V1_STR}/redoc"
 )
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    
+    openapi_schema = get_openapi(
+        title=settings.PROJECT_NAME,
+        version="1.0.0",
+        description="面试系统后端API",
+        routes=app.routes,
+    )
+    
+    # 添加OAuth2密码流配置
+    openapi_schema["components"]["securitySchemes"] = {
+        "OAuth2PasswordBearer": {
+            "type": "oauth2",
+            "flows": {
+                "password": {
+                    "tokenUrl": f"{settings.API_V1_STR}/auth/login-form",
+                    "scopes": {}
+                }
+            }
+        }
+    }
+    
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 # ===== CORS中间件配置 =====
 app.add_middleware(
     CORSMiddleware,
@@ -30,10 +60,6 @@ app.add_middleware(
 # ===== 全局异常处理 =====
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
-    """
-    统一HTTP异常处理
-    确保返回格式与前端期望的 {code, data, message} 结构一致
-    """
     return JSONResponse(
         status_code=exc.status_code,
         content={
@@ -45,8 +71,7 @@ async def http_exception_handler(request, exc):
 
 @app.exception_handler(Exception)
 async def general_exception_handler(request, exc):
-    """统一一般异常处理"""
-    print(f"Unexpected error: {str(exc)}")  # 记录到日志
+    print(f"Unexpected error: {str(exc)}")
     return JSONResponse(
         status_code=500,
         content={
@@ -64,7 +89,6 @@ app.include_router(
     tags=["Authentication"]
 )
 
-# 用户路由
 app.include_router(
     users.router,
     prefix=f"{settings.API_V1_STR}/users",
@@ -167,6 +191,7 @@ async def shutdown_event():
     """应用关闭事件"""
     print(f"👋 {settings.PROJECT_NAME} 正在关闭")
 
+    '''
 # ===== 开发模式启动配置 =====
 if __name__ == "__main__":
     import uvicorn
@@ -177,3 +202,4 @@ if __name__ == "__main__":
         reload=True,  # 开发模式自动重载
         log_level="info"
     )
+    '''
