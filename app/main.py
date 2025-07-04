@@ -1,12 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.openapi.utils import get_openapi  # 新增导入
+from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles  # 新增：用于提供静态文件服务
 import time
+import os  # 新增
 
 from app.core.config import settings
-from app.api import auth, users
-# from app.api import positions, interviews  # 暂时注释掉，专注于auth和users
+from app.api import auth, users, resumes  # 🔥 添加 resumes 导入
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -50,12 +51,21 @@ app.openapi = custom_openapi
 # ===== CORS中间件配置 =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_cors_origins(),  # 使用配置文件中的CORS设置
+    allow_origins=settings.get_cors_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["*"]
 )
+
+# ===== 静态文件服务配置 =====
+# 创建上传目录（如果不存在）
+upload_dir = "uploads"
+os.makedirs(upload_dir, exist_ok=True)
+os.makedirs(os.path.join(upload_dir, "resumes"), exist_ok=True)
+
+# 提供静态文件访问（用于简历预览等）
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # ===== 全局异常处理 =====
 @app.exception_handler(HTTPException)
@@ -89,22 +99,19 @@ app.include_router(
     tags=["Authentication"]
 )
 
+# 用户路由
 app.include_router(
     users.router,
     prefix=f"{settings.API_V1_STR}/users",
     tags=["Users"]
 )
 
-# 暂时注释其他路由，专注于auth和users
-# app.include_router(
-#     positions.router,
-#     prefix="/api/v1",
-# )
-# 
-# app.include_router(
-#     interviews.router,
-#     prefix="/api/v1",
-# )
+# 🔥 简历路由（新增）
+app.include_router(
+    resumes.router,
+    prefix=f"{settings.API_V1_STR}/resumes",
+    tags=["Resumes"]
+)
 
 # ===== 基础路由 =====
 @app.get("/")
@@ -121,15 +128,9 @@ def root():
         "message": "API服务运行正常"
     }
 
-# ===== 新增：健康检查接口 =====
 @app.get(f"{settings.API_V1_STR}/health")
 def health_check():
-    """
-    健康检查接口
-    GET /api/v1/health
-    
-    匹配前端测试: 用于验证前后端连接
-    """
+    """健康检查接口"""
     return {
         "code": 200,
         "data": {
@@ -144,12 +145,7 @@ def health_check():
 
 @app.get(f"{settings.API_V1_STR}/info")
 def api_info():
-    """
-    API信息接口
-    GET /api/v1/info
-    
-    返回API的详细信息和可用端点
-    """
+    """API信息接口"""
     return {
         "code": 200,
         "data": {
@@ -169,6 +165,13 @@ def api_info():
                     "update_me": "PUT /api/v1/users/me",
                     "check_username": "POST /api/v1/users/check-username",
                     "check_email": "POST /api/v1/users/check-email"
+                },
+                # 🔥 新增：简历相关接口文档
+                "resumes": {
+                    "upload": "POST /api/v1/resumes",
+                    "list": "GET /api/v1/resumes",
+                    "delete": "DELETE /api/v1/resumes/{resume_id}",
+                    "set_active": "PUT /api/v1/resumes/{resume_id}/activate"
                 }
             },
             "documentation": f"{settings.API_V1_STR}/docs",
@@ -184,22 +187,10 @@ async def startup_event():
     print(f"🚀 {settings.PROJECT_NAME} 启动成功")
     print(f"📖 API文档: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}{settings.API_V1_STR}/docs")
     print(f"🔗 健康检查: http://{settings.SERVER_HOST}:{settings.SERVER_PORT}{settings.API_V1_STR}/health")
+    print(f"📁 上传目录: {os.path.abspath('uploads')}")
     print(f"🌐 CORS允许域名: {settings.get_cors_origins()}")
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """应用关闭事件"""
     print(f"👋 {settings.PROJECT_NAME} 正在关闭")
-
-    '''
-# ===== 开发模式启动配置 =====
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(
-        "app.main:app",  # 指定应用路径
-        host=settings.SERVER_HOST,
-        port=settings.SERVER_PORT,
-        reload=True,  # 开发模式自动重载
-        log_level="info"
-    )
-    '''
