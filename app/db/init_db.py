@@ -1,6 +1,5 @@
 from app.db.database import engine, Base
-from app.models import user, profile, resume # 导入所有模型
-
+from app.models import user, profile, resume, question  # 确保所有模型都导入
 
 def create_tables():
     """创建所有数据库表"""
