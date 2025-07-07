@@ -250,7 +250,7 @@ def debug_user_profile(
                 "message": "调试信息获取成功"
             }
         else:
-            print("❌ 用户没有profile记录")
+            print(" 用户没有profile记录")
             return {
                 "code": 200,
                 "data": {

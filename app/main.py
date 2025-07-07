@@ -7,7 +7,7 @@ import time
 import os  # 新增
 
 from app.core.config import settings
-from app.api import auth, users, resumes, positions, questions  # 🔥 添加 resumes 导入
+from app.api import auth, users, resumes, positions, questions, interview  # 🔥 添加 resumes 导入
 
 # 创建FastAPI应用
 app = FastAPI(
@@ -106,7 +106,6 @@ app.include_router(
     tags=["Users"]
 )
 
-# 🔥 简历路由（新增）
 app.include_router(
     resumes.router,
     prefix=f"{settings.API_V1_STR}/resumes",
@@ -124,6 +123,13 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/questions",
     tags=["Questions"]
 )
+
+app.include_router(
+    interview.router, 
+    prefix="/api/v1/interviews", 
+    tags=["interview"]
+)
+
 # ===== 基础路由 =====
 @app.get("/")
 def root():

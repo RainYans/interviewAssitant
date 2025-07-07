@@ -1,11 +1,18 @@
+# app/db/init_db.py (更新版本)
 from app.db.database import engine, Base
-from app.models import user, profile, resume, question  # 确保所有模型都导入
+# 确保导入所有模型
+from app.models import user, profile, resume, question, interview  # 新增interview
 
 def create_tables():
     """创建所有数据库表"""
     print("正在创建数据库表...")
     Base.metadata.create_all(bind=engine)
     print("数据库表创建完成！")
+    print("新增的面试相关表：")
+    print("- interviews (面试记录)")
+    print("- interview_questions (面试题目)")
+    print("- interview_statistics (用户统计)")
+    print("- interview_trend_data (趋势数据)")
 
 def drop_tables():
     """删除所有数据库表（谨慎使用）"""
