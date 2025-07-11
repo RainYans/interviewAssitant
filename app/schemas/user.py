@@ -1,42 +1,52 @@
+# app/schemas/user.py
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 
-# 用户基础模式
-class UserBase(BaseModel):
-    email: EmailStr
+# ================== 用户认证相关 ==================
+
+class UserCreate(BaseModel):
     username: str
-
-# 用户创建模式
-class UserCreate(UserBase):
-    password: str
-
-# 用户更新模式
-class UserUpdate(BaseModel):
-    email: Optional[EmailStr] = None
-    username: Optional[str] = None
-    password: Optional[str] = None
-
-# 用户模式(响应)
-class User(UserBase):
-    id: int
-    is_active: bool
-    created_at: datetime
-    updated_at: Optional[datetime] = None
-    
-    class Config:
-        orm_mode = True
-
-# 用户登录模式
-class UserLogin(BaseModel):
     email: EmailStr
     password: str
 
-# 令牌数据模式
-class TokenData(BaseModel):
-    user_id: Optional[int] = None
+class UserLogin(BaseModel):
+    username: str  # 登录时使用用户名，而不是邮箱
+    password: str
 
-# 令牌响应模式
 class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str
+    token: str
+    token_type: str = "bearer"
+
+# ================== 用户资料相关 ==================
+
+class UserProfileUpdate(BaseModel):
+    """用于更新用户资料的Schema，匹配前端表单"""
+    age: Optional[int] = None
+    graduation_year: Optional[str] = None
+    education: Optional[str] = None
+    school: Optional[str] = None
+    major: Optional[str] = None
+    major_category: Optional[str] = None
+    target_position: Optional[List[str]] = None
+
+class UserResponse(BaseModel):
+    """统一的用户信息返回模型"""
+    id: int
+    username: str
+    email: EmailStr
+    
+    # 个人资料字段 (可以为None)
+    age: Optional[int] = None
+    graduation_year: Optional[str] = None
+    education: Optional[str] = None
+    school: Optional[str] = None
+    major: Optional[str] = None
+    major_category: Optional[str] = None
+    target_position: Optional[List[str]] = []
+    
+    # **关键字段**：告诉前端资料是否完善
+    has_profile: bool
+
+    class Config:
+        from_attributes = True # 兼容 SQLAlchemy 模型

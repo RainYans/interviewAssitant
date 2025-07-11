@@ -1,100 +1,89 @@
 # app/services/user_service.py
 from sqlalchemy.orm import Session
+from typing import Optional 
+import json
 from app.models.user import User
 from app.models.profile import UserProfile
-from app.core.security import get_password_hash
-from app.schemas.user import UserUpdate
 
-def get_user_by_email(db: Session, email: str):
-    """通过邮箱获取用户"""
-    return db.query(User).filter(User.email == email).first()
-
-def get_user_by_username(db: Session, username: str):
-    """通过用户名获取用户"""
-    return db.query(User).filter(User.username == username).first()
-
-def update_user(db: Session, user_id: int, user_update: UserUpdate):
-    """更新用户基本信息"""
-    user = db.query(User).filter(User.id == user_id).first()
-    
-    if not user:
-        return None
-    
-    # 更新字段
-    if user_update.email:
-        user.email = user_update.email
-    if user_update.username:
-        user.username = user_update.username
-    if user_update.password:
-        user.hashed_password = get_password_hash(user_update.password)
-    
-    db.commit()
-    db.refresh(user)
-    
-    return user
-
-def get_user_profile(db: Session, user_id: int):
-    """获取用户资料"""
+def get_user_profile(db: Session, user_id: int) -> Optional[UserProfile]:
+    """获取用户的Profile记录"""
     return db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
 
-def update_user_profile(db: Session, user_id: int, profile_data: dict):
-    """更新或创建用户资料"""
-    # 查找现有资料
-    profile = db.query(UserProfile).filter(UserProfile.user_id == user_id).first()
+def check_profile_complete(profile: Optional[UserProfile]) -> bool:
+    """检查用户资料是否完整"""
+    if not profile:
+        print("❌ 检查失败: Profile记录在数据库中不存在。")
+        return False
+    # 定义所有必填的资料字段
+    required_fields = ['age', 'graduation_year', 'education', 'school', 'major', 'target_position']
+    for field in required_fields:
+        value = getattr(profile, field, None)
+        # 任何一个字段是None或空字符串都算不完整
+        if value is None or value == '':
+            print(f"❌ 检查失败: 字段 '{field}' 是空的。")
+            return False
+                # 专门检查列表类型是否为空
+        if isinstance(value, list) and not value:
+            print(f"❌ 检查失败: 字段 '{field}' 是一个空列表。")
+            return False
+            
+        # 专门检查从数据库取出的JSON字符串是否是代表空列表的 "[]"
+        if isinstance(value, str) and value.strip() == '[]':
+            print(f"❌ 检查失败: 字段 '{field}' 是一个空的JSON列表字符串 '[]'。")
+            return False
+        # 对列表/JSON字段，需要判断是否为空列表
+        if field == 'target_position':
+            # 数据库里存的是JSON字符串或原生JSON
+            if isinstance(value, str):
+                try:
+                    parsed_list = json.loads(value)
+                    if not parsed_list: return False
+                except json.JSONDecodeError:
+                    return False
+            elif isinstance(value, list) and not value:
+                return False
+    print("✅ 检查通过: 所有必填字段都已填写。")
+    return True
+
+def get_user_profile_data(db: Session, user: User) -> dict:
+    """获取完整的用户资料和完成状态"""
+    profile = get_user_profile(db, user.id)
+    is_complete = check_profile_complete(profile)
+    
+    user_data = {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "has_profile": is_complete,
+    }
     
     if profile:
-        # 更新现有资料
+        # 将profile的所有字段合并到返回数据中
+        profile_dict = {c.name: getattr(profile, c.name) for c in profile.__table__.columns if c.name not in ['id', 'user_id', 'created_at', 'updated_at']}
+        # 特殊处理JSON字段的解码
+        if 'target_position' in profile_dict and isinstance(profile_dict['target_position'], str):
+            try:
+                profile_dict['target_position'] = json.loads(profile_dict['target_position'])
+            except json.JSONDecodeError:
+                profile_dict['target_position'] = []
+        user_data.update(profile_dict)
+    
+    return user_data
+
+def update_or_create_user_profile(db: Session, user_id: int, profile_data: dict):
+    """更新或创建用户资料"""
+    profile = get_user_profile(db, user_id)
+    
+    if 'target_position' in profile_data and isinstance(profile_data['target_position'], list):
+        profile_data['target_position'] = json.dumps(profile_data['target_position'], ensure_ascii=False)
+
+    if profile:
         for key, value in profile_data.items():
-            if hasattr(profile, key) and value is not None:
-                setattr(profile, key, value)
+            setattr(profile, key, value)
     else:
-        # 创建新资料
         profile = UserProfile(user_id=user_id, **profile_data)
         db.add(profile)
     
-    # ===== 修复：这三行应该在这里！ =====
     db.commit()
     db.refresh(profile)
     return profile
-
-def check_profile_complete(profile):
-    """
-    检查用户资料是否完整
-    返回 True/False
-    """
-    if not profile:
-        return False
-    
-    # 定义必需字段（与前端Profile.vue中的必填项对应）
-    required_fields = [
-        'age',           # 年龄
-        'graduation_year', # 毕业年份
-        'education',     # 学历
-        'school',        # 院校
-        'major_category', # 专业类别
-        'major',         # 具体专业
-        'target_position' # 意向岗位
-    ]
-    
-    for field in required_fields:
-        value = getattr(profile, field, None)
-        
-        # 检查字段是否为空
-        if not value or value == '' or value == 'null':
-            return False
-            
-        # 特殊处理target_position（JSON字符串）
-        if field == 'target_position':
-            try:
-                import json
-                if isinstance(value, str):
-                    parsed_value = json.loads(value)
-                    if not parsed_value or len(parsed_value) == 0:
-                        return False
-                elif isinstance(value, list):
-                    if len(value) == 0:
-                        return False
-            except:
-                return False
-    
-    return True

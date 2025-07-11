@@ -1,27 +1,29 @@
 from datetime import timedelta
 from sqlalchemy.orm import Session
 from app.db.repositories import user_repo
+from app.core import security
 from app.core.security import verify_password, create_access_token
 from app.core.config import settings
 from app.schemas.user import UserCreate
 
-def authenticate_user(db: Session, username_or_email: str, password: str):
+def authenticate_user(db: Session, username: str, password: str):
     """
-    验证用户并返回用户对象
-    支持用户名或邮箱登录 - 匹配前端发送的username字段
+    验证用户并返回用户对象。
+    支持用户名或邮箱登录。
+    参数名已从 username_or_email 修改为 username 以匹配API层的调用。
     """
     user = None
     
     # 首先尝试作为邮箱查找
-    if "@" in username_or_email:
-        user = user_repo.get_user_by_email(db, username_or_email)
+    if "@" in username:
+        user = user_repo.get_user_by_email(db, email=username)
     
     # 如果邮箱查找失败，或者输入不包含@，尝试作为用户名查找
     if not user:
-        user = user_repo.get_user_by_username(db, username_or_email)
+        user = user_repo.get_user_by_username(db, username=username)
     
     # 验证密码
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not security.verify_password(password, user.hashed_password):
         return None
         
     # 检查用户是否激活
@@ -49,9 +51,13 @@ def get_user_by_username(db: Session, username: str):
     """通过用户名获取用户"""
     return user_repo.get_user_by_username(db, username)
 
-def create_user(db: Session, user_data: UserCreate):
-    """创建新用户"""
-    return user_repo.create_user(db, user_data)
+def create_user(db: Session, user_in: UserCreate):
+    """
+    创建新用户。
+    我们将参数名从 user_data 修改为 user_in，与 auth.py 中的调用保持一致。
+    """
+    # 这里的参数名也相应修改
+    return user_repo.create_user(db, user=user_in) 
 
 def check_user_exists(db: Session, username: str = None, email: str = None):
     """

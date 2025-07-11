@@ -8,7 +8,9 @@ import json
 import random
 
 from app.db.database import get_db
-from app.core.security import get_current_user
+# 👇 --- 修改点 1: 导入新的、更安全的函数 ---
+from app.core.security import get_current_active_user
+from app.models.user import User # 确保导入User模型以在依赖中使用
 from app.models.interview import Interview, InterviewQuestion, InterviewStatistics, InterviewTrendData
 from app.models.question import Question
 from app.schemas.interview import *
@@ -20,7 +22,8 @@ router = APIRouter()
 @router.post("/start")
 def start_interview(
     interview_data: InterviewCreate,
-    current_user = Depends(get_current_user),
+    # 👇 --- 修改点 2: 使用新的依赖 ---
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -83,7 +86,7 @@ def start_interview(
 def submit_answer(
     question_id: int,
     answer_data: AnswerSubmit,
-    current_user = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -168,7 +171,7 @@ def submit_answer(
 @router.get("/questions/{question_id}/next")
 def get_next_question(
     question_id: int,
-    current_user = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -247,7 +250,7 @@ def get_next_question(
 def complete_interview(
     interview_id: int,
     complete_data: InterviewComplete,
-    current_user = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -320,7 +323,7 @@ def complete_interview(
 
 @router.get("/performance")
 def get_interview_performance(
-    current_user = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -395,7 +398,7 @@ def get_interview_performance(
 def get_trend_data(
     dimension: str = "overall",
     period: str = "month",
-    current_user = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -460,7 +463,7 @@ def get_trend_data(
 def get_interview_history(
     page: int = 1,
     page_size: int = 10,
-    current_user = Depends(get_current_user),
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """

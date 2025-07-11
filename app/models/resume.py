@@ -31,7 +31,7 @@ class Resume(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
     # 关系
-    #user = relationship("User", back_populates="resumes")
-    user = relationship("User")
+    user = relationship("User", back_populates="resumes")
+    
 
 

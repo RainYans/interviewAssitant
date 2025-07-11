@@ -6,7 +6,9 @@ from typing import List, Optional
 import json
 
 from app.db.database import get_db
-from app.core.security import get_current_user
+# 👇 --- 修改点 1: 导入新的、更安全的函数 ---
+from app.core.security import get_current_active_user
+from app.models.user import User  # 确保导入User模型
 from app.models.question import Question, QuestionCategory, UserQuestionProgress
 
 # 创建路由器
@@ -14,13 +16,14 @@ router = APIRouter()
 
 @router.get("/")
 def get_questions(
+    # 这个接口是公开的，所以不需要用户认证
+    db: Session = Depends(get_db),
     category: Optional[str] = Query(None, description="分类筛选"),
     difficulty: Optional[str] = Query(None, description="难度筛选"),
     search: Optional[str] = Query(None, description="搜索关键词"),
     tags: Optional[str] = Query(None, description="标签筛选，逗号分隔"),
     page: int = Query(1, ge=1, description="页码"),
-    page_size: int = Query(10, ge=1, le=50, description="每页数量"),
-    db: Session = Depends(get_db)
+    page_size: int = Query(10, ge=1, le=50, description="每页数量")
 ):
     """
     获取题目列表
@@ -111,8 +114,9 @@ def get_questions(
 @router.get("/{question_id}")
 def get_question_detail(
     question_id: int,
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    # 👇 --- 修改点 2: 使用新的依赖 ---
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     获取题目详情
@@ -190,9 +194,10 @@ def get_question_detail(
 
 @router.post("/{question_id}/collect")
 def toggle_collect_question(
-    question_id: int,
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
+   question_id: int,
+    db: Session = Depends(get_db),
+    # 👇 --- 修改点 3: 使用新的依赖 ---
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     收藏/取消收藏题目
@@ -300,8 +305,9 @@ def get_question_categories(db: Session = Depends(get_db)):
 
 @router.get("/stats/user")
 def get_user_study_stats(
-    current_user = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    # 👇 --- 修改点 4: 使用新的依赖 ---
+    current_user: User = Depends(get_current_active_user)
 ):
     """
     获取用户学习统计

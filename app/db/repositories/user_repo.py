@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from app.models.user import User
-from app.schemas.user import UserCreate, UserUpdate
+from app.schemas.user import UserCreate,  UserProfileUpdate
 from app.core.security import get_password_hash
 
 def get_user_by_email(db: Session, email: str):
@@ -15,13 +15,13 @@ def get_user_by_id(db: Session, user_id: int):
     """通过ID获取用户"""
     return db.query(User).filter(User.id == user_id).first()
 
-def create_user(db: Session, user_data: UserCreate):
+def create_user(db: Session, user: UserCreate):
     """创建新用户"""
     # 创建新用户实例
-    hashed_password = get_password_hash(user_data.password)
+    hashed_password = get_password_hash(user.password)
     db_user = User(
-        email=user_data.email,
-        username=user_data.username,
+        email=user.email,
+        username=user.username,
         hashed_password=hashed_password,
         is_active=True
     )
@@ -33,7 +33,7 @@ def create_user(db: Session, user_data: UserCreate):
     
     return db_user
 
-def update_user(db: Session, user_id: int, user_update: UserUpdate):
+def update_user(db: Session, user_id: int, user_update:  UserProfileUpdate):
     """更新用户信息"""
     user = db.query(User).filter(User.id == user_id).first()
     

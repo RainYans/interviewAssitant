@@ -1,32 +1,29 @@
 # app/models/profile.py
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
-from sqlalchemy.sql import func
+from sqlalchemy import Column, Integer, String, JSON, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from app.db.database import Base
 
 class UserProfile(Base):
-    """用户资料数据库模型"""
+    """用户基本资料数据库模型"""
     __tablename__ = "user_profiles"
-    
+
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), unique=True, nullable=False)
-    
-    # 基本信息
+
+    # 与前端 BasicInfo.vue 和 Profile.vue 表单对应的字段
     age = Column(Integer, nullable=True)
-    graduation_year = Column(String(4), nullable=True)  # 毕业年份，如 "2024"
+    graduation_year = Column(String, nullable=True)
+    education = Column(String, nullable=True)
+    school = Column(String, nullable=True)
+    major = Column(String, nullable=True)
+    major_category = Column(String, nullable=True) # Profile.vue 中需要
     
-    # 教育背景
-    education = Column(String(50), nullable=True)  # 专科/本科/硕士/博士
-    school = Column(String(255), nullable=True)    # 院校名称
-    
-    # 专业信息
-    major_category = Column(String(50), nullable=True)  # 专业类别
-    major = Column(String(255), nullable=True)          # 具体专业
-    target_position = Column(Text, nullable=True)       # JSON格式存储意向岗位列表
-    
-    # 时间戳
+    # 意向岗位是个列表，用JSON类型存储
+    target_position = Column(JSON, nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    
-    # 关系
+
+    # 与User模型建立反向关系
     user = relationship("User", back_populates="profile")

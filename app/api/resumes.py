@@ -7,7 +7,9 @@ import uuid
 from datetime import datetime
 
 from app.db.database import get_db
-from app.core.security import get_current_user
+# 👇 --- 修改点 1: 导入新的、更安全的函数 ---
+from app.core.security import get_current_active_user
+from app.models.user import User  # 确保导入User模型以在依赖中使用
 from app.models.resume import Resume
 from app.core.config import settings
 
@@ -20,8 +22,7 @@ MAX_FILE_SIZE = 10 * 1024 * 1024  # 10MB
 
 def allowed_file(filename: str) -> bool:
     """检查文件类型是否允许"""
-    return '.' in filename and \
-           os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and os.path.splitext(filename)[1].lower() in ALLOWED_EXTENSIONS
 
 def get_file_size(file: UploadFile) -> int:
     """获取上传文件大小"""
@@ -33,7 +34,8 @@ def get_file_size(file: UploadFile) -> int:
 @router.post("/")
 async def upload_resume(
     file: UploadFile = File(...),
-    current_user = Depends(get_current_user),
+    # 👇 --- 修改点 2: 在所有需要用户认证的接口中，使用新的依赖 ---
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -67,7 +69,7 @@ async def upload_resume(
         stored_filename = f"{uuid.uuid4().hex}{file_ext}"
         
         # 确保上传目录存在
-        upload_dir = "uploads/resumes"
+        upload_dir = os.path.join(settings.UPLOAD_FOLDER, "resumes")
         os.makedirs(upload_dir, exist_ok=True)
         
         # 保存文件
@@ -92,7 +94,7 @@ async def upload_resume(
         db.commit()
         db.refresh(resume)
         
-        print(f" 用户 {current_user.username} 上传简历成功: {file.filename}")
+        print(f"✅ 用户 {current_user.username} 上传简历成功: {file.filename}")
         
         return {
             "code": 200,
@@ -121,7 +123,8 @@ async def upload_resume(
 
 @router.get("/")
 def get_resumes(
-    current_user = Depends(get_current_user),
+    # 👇 --- 修改点 3 ---
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -136,7 +139,7 @@ def get_resumes(
             resume_data = {
                 "id": resume.id,
                 "filename": resume.filename,
-                "stored_filename": resume.stored_filename,  # 添加这行
+                "stored_filename": resume.stored_filename,
                 "file_size": resume.file_size,
                 "file_type": resume.file_type,
                 "upload_time": resume.created_at.strftime("%Y-%m-%d %H:%M:%S"),
@@ -170,7 +173,8 @@ def get_resumes(
 @router.delete("/{resume_id}")
 def delete_resume(
     resume_id: int,
-    current_user = Depends(get_current_user),
+    # 👇 --- 修改点 4 ---
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -178,7 +182,6 @@ def delete_resume(
     DELETE /api/v1/resumes/{resume_id}
     """
     try:
-        # 查找简历
         resume = db.query(Resume).filter(
             Resume.id == resume_id,
             Resume.user_id == current_user.id
@@ -194,7 +197,6 @@ def delete_resume(
         if os.path.exists(resume.file_path):
             os.remove(resume.file_path)
         
-        # 删除数据库记录
         db.delete(resume)
         db.commit()
         
@@ -218,7 +220,8 @@ def delete_resume(
 @router.put("/{resume_id}/activate")
 def set_active_resume(
     resume_id: int,
-    current_user = Depends(get_current_user),
+    # 👇 --- 修改点 5 ---
+    current_user: User = Depends(get_current_active_user),
     db: Session = Depends(get_db)
 ):
     """
@@ -226,7 +229,6 @@ def set_active_resume(
     PUT /api/v1/resumes/{resume_id}/activate
     """
     try:
-        # 查找要激活的简历
         resume = db.query(Resume).filter(
             Resume.id == resume_id,
             Resume.user_id == current_user.id
@@ -238,14 +240,12 @@ def set_active_resume(
                 detail="简历不存在"
             )
         
-        # 先取消所有简历的激活状态
         db.query(Resume).filter(Resume.user_id == current_user.id).update({"is_active": False})
         
-        # 激活指定简历
         resume.is_active = True
         db.commit()
         
-        print(f"用户 {current_user.username} 设置默认简历: {resume.filename}")
+        print(f"✅ 用户 {current_user.username} 设置默认简历: {resume.filename}")
         
         return {
             "code": 200,
